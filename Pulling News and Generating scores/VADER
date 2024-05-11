@@ -3,16 +3,24 @@ import pandas as pd
 from textblob import TextBlob
 import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
+from datetime import datetime, timedelta
+# Importing transformers for sentiment analysis
+import transformers
+# Importing transformers for sentiment analysis
+from transformers import pipeline
 
-# Download the VADER lexicon
+
+
+
 
 nltk.download('vader_lexicon')
 
 sia = SentimentIntensityAnalyzer()
 
-# API endpoint for The Guardian
 
+# API endpoint for The Guardian
 url = "https://content.guardianapis.com/search?order-by=newest&use-date=published&page-size=200&q=unilever&api-key=a904a776-c773-44ed-850c-383bfcf9866f"
+
 
 response = requests.get(url)
 api_response = response.json()
@@ -20,17 +28,13 @@ api_response = response.json()
 data = api_response['response']['results']
 
 # Filter the results to include only entries that contain 'unilever' in the webTitle
-
 filtered_results = [r for r in data if 'unilever' in r['webTitle'].lower()]
 
 # Create a DataFrame from the filtered results
-
 df = pd.DataFrame(filtered_results, columns=['webPublicationDate', 'webTitle'])
 
-def get_sentiment(text):
-return TextBlob(text).sentiment.polarity
 
-#To convert news date from saturday/sunday to Monday, as market opens only on weekdays.
+# Helper function to adjust weekend dates to Monday
 def adjust_date(date_str):
     date_obj = datetime.strptime(date_str, "%Y-%m-%d")
     # Check if the date is Saturday (5) or Sunday (6)
@@ -41,11 +45,24 @@ def adjust_date(date_str):
     return date_str
 
 
+# Function to extract sentiment using transformers
+
+
+
+def get_sentiment(text):
+    scores = sia.polarity_scores(text)
+    return scores['compound']
+
+
 enhanced_data = [{
-'webPublicationDate': adjust_date(r['webPublicationDate'][:10]),
-'webTitle': r['webTitle'],
-'Sentiment': sia.polarity_scores(r['webTitle'])['compound']
+    'webPublicationDate': adjust_date(r['webPublicationDate'][:10]),
+    'webTitle': r['webTitle'],
+    'Sentiment': get_sentiment(r['webTitle'])
 } for r in data if 'unilever' in r['webTitle'].lower()]
+
+
+
+
 
 df = pd.DataFrame(enhanced_data)
 pd.set_option('display.max_rows', None)  # Adjust this as needed or use None to display all rows

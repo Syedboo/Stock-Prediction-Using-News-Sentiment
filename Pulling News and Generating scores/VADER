@@ -1,0 +1,56 @@
+import requests
+import pandas as pd
+from textblob import TextBlob
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
+
+# Download the VADER lexicon
+
+nltk.download('vader_lexicon')
+
+sia = SentimentIntensityAnalyzer()
+
+# API endpoint for The Guardian
+
+url = "https://content.guardianapis.com/search?order-by=newest&use-date=published&page-size=200&q=unilever&api-key=a904a776-c773-44ed-850c-383bfcf9866f"
+
+response = requests.get(url)
+api_response = response.json()
+
+data = api_response['response']['results']
+
+# Filter the results to include only entries that contain 'unilever' in the webTitle
+
+filtered_results = [r for r in data if 'unilever' in r['webTitle'].lower()]
+
+# Create a DataFrame from the filtered results
+
+df = pd.DataFrame(filtered_results, columns=['webPublicationDate', 'webTitle'])
+
+def get_sentiment(text):
+return TextBlob(text).sentiment.polarity
+
+#To convert news date from saturday/sunday to Monday, as market opens only on weekdays.
+def adjust_date(date_str):
+    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+    # Check if the date is Saturday (5) or Sunday (6)
+    if date_obj.weekday() == 5:  # Saturday
+        return (date_obj + timedelta(days=2)).strftime("%Y-%m-%d")
+    elif date_obj.weekday() == 6:  # Sunday
+        return (date_obj + timedelta(days=1)).strftime("%Y-%m-%d")
+    return date_str
+
+
+enhanced_data = [{
+'webPublicationDate': adjust_date(r['webPublicationDate'][:10]),
+'webTitle': r['webTitle'],
+'Sentiment': sia.polarity_scores(r['webTitle'])['compound']
+} for r in data if 'unilever' in r['webTitle'].lower()]
+
+df = pd.DataFrame(enhanced_data)
+pd.set_option('display.max_rows', None)  # Adjust this as needed or use None to display all rows
+pd.set_option('display.max_columns', None)  # Adjust or use None to display all columns
+pd.set_option('display.width', 1000)
+print(df)
+
+df.to_csv('test1.txt', index=False)
